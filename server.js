@@ -6,7 +6,15 @@ const fs = require('fs');
 const { Parser } = require('json2csv');
 
 const app = express();
-const dbPath = path.join(__dirname, 'evacuation.db');
+
+// Use persistent disk path if available, otherwise use current directory
+const dataDir = process.env.RENDER ? '/var/data' : __dirname;
+const dbPath = path.join(dataDir, 'evacuation.db');
+
+// Ensure data directory exists
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
@@ -17,7 +25,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Database error:', err);
   } else {
-    console.log('Connected to SQLite database');
+    console.log('Connected to SQLite database at:', dbPath);
     initializeDatabase();
   }
 });
@@ -235,5 +243,5 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`Visit http://localhost:${PORT}`);
+  console.log(`Using database at: ${dbPath}`);
 });
