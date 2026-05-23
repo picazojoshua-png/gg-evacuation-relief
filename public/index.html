@@ -94,6 +94,24 @@
     .btn-secondary:hover {
       background: #f5f5f5;
     }
+    .btn-small {
+      padding: 6px 12px;
+      font-size: 12px;
+      background: #dc2626;
+      color: white;
+    }
+    .btn-small:hover {
+      background: #991b1b;
+    }
+    .btn-remove {
+      padding: 6px 12px;
+      font-size: 12px;
+      background: #ef4444;
+      color: white;
+    }
+    .btn-remove:hover {
+      background: #dc2626;
+    }
     .btn-export {
       background: #059669;
       color: white;
@@ -149,6 +167,34 @@
     textarea {
       resize: vertical;
       min-height: 120px;
+    }
+    .expenses-section {
+      background: #f9f9f9;
+      padding: 1.5rem;
+      border-radius: 6px;
+      margin-bottom: 1.5rem;
+    }
+    .expenses-section h3 {
+      font-size: 15px;
+      margin-bottom: 1rem;
+      color: #333;
+    }
+    .expense-item {
+      background: white;
+      padding: 1rem;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr 100px 50px;
+      gap: 12px;
+      align-items: end;
+    }
+    .expense-item label {
+      font-size: 12px;
+    }
+    .expense-item input, .expense-item select {
+      margin-top: 4px;
     }
     .checkbox-group {
       display: flex;
@@ -243,7 +289,24 @@
       font-size: 14px;
       line-height: 1.6;
       color: #333;
-      margin: 0;
+      margin: 1rem 0 0 0;
+    }
+    .story-expenses {
+      background: #f9f9f9;
+      padding: 1rem;
+      border-radius: 6px;
+      margin-top: 1rem;
+      font-size: 13px;
+    }
+    .story-expenses strong {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: #333;
+    }
+    .expense-line {
+      padding: 4px 0;
+      display: flex;
+      justify-content: space-between;
     }
     .empty {
       background: #f9f9f9;
@@ -347,22 +410,12 @@
         </div>
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label>Expense type</label>
-          <select id="category" required>
-            <option value="Hotel">Hotel</option>
-            <option value="Pet Boarding">Pet Boarding</option>
-            <option value="Food & Supplies">Food & Supplies</option>
-            <option value="Medical">Medical</option>
-            <option value="Transportation">Transportation</option>
-            <option value="Other">Other</option>
-          </select>
+      <div class="expenses-section">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h3>Expenses (add all costs from the evacuation)</h3>
+          <button type="button" class="btn-small" onclick="addExpense()">+ Add expense</button>
         </div>
-        <div class="form-group">
-          <label>Amount spent ($)</label>
-          <input type="number" id="amount" placeholder="0.00" step="0.01" min="0" max="100000" required>
-        </div>
+        <div id="expensesContainer"></div>
       </div>
 
       <div class="form-group">
@@ -408,6 +461,51 @@
     let allStories = [];
     let currentFilter = 'All';
     let categories = [];
+    let expenseCounter = 0;
+
+    function addExpense() {
+      const container = document.getElementById('expensesContainer');
+      const id = expenseCounter++;
+      const expense = document.createElement('div');
+      expense.className = 'expense-item';
+      expense.id = `expense-${id}`;
+      expense.innerHTML = `
+        <div class="form-group">
+          <label>Type</label>
+          <select class="expense-category" required>
+            <option value="Hotel">Hotel</option>
+            <option value="Pet Boarding">Pet Boarding</option>
+            <option value="Food & Supplies">Food & Supplies</option>
+            <option value="Medical">Medical</option>
+            <option value="Transportation">Transportation</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Amount ($)</label>
+          <input type="number" class="expense-amount" placeholder="0.00" step="0.01" min="0" required>
+        </div>
+        <div style="text-align: center; font-size: 12px; color: #999;">
+          <span class="expense-total">$0</span>
+        </div>
+        <button type="button" class="btn-remove" onclick="removeExpense(${id})">Remove</button>
+      `;
+      
+      const amountInput = expense.querySelector('.expense-amount');
+      amountInput.addEventListener('input', () => {
+        const total = amountInput.value || '0';
+        expense.querySelector('.expense-total').textContent = '$' + parseFloat(total).toFixed(2);
+      });
+      
+      container.appendChild(expense);
+    }
+
+    function removeExpense(id) {
+      const expense = document.getElementById(`expense-${id}`);
+      if (expense) {
+        expense.remove();
+      }
+    }
 
     async function loadStories() {
       try {
@@ -467,19 +565,46 @@
         return;
       }
       
-      container.innerHTML = stories.map(story => `
-        <div class="story">
-          <div class="story-header">
-            <div class="story-info">
-              <h3>${story.publicName ? story.name : 'Anonymous'}</h3>
-              <div class="story-meta">${story.address} • ${story.category}</div>
-              <div class="story-date">${new Date(story.timestamp).toLocaleDateString()}</div>
+      container.innerHTML = stories.map(story => {
+        let expenses = [];
+        try {
+          expenses = JSON.parse(story.story_expenses || '[]');
+        } catch (e) {
+          expenses = [];
+        }
+        
+        const totalAmount = expenses.reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0);
+        const expensesHtml = expenses.length > 0 ? `
+          <div class="story-expenses">
+            <strong>Expenses:</strong>
+            ${expenses.map(exp => `
+              <div class="expense-line">
+                <span>${exp.category}</span>
+                <span>$${parseFloat(exp.amount).toLocaleString()}</span>
+              </div>
+            `).join('')}
+            <div class="expense-line" style="border-top: 1px solid #ddd; padding-top: 4px; margin-top: 4px; font-weight: bold;">
+              <span>Total</span>
+              <span>$${totalAmount.toLocaleString()}</span>
             </div>
-            <div class="story-amount">$${parseFloat(story.amount).toLocaleString()}</div>
           </div>
-          <p class="story-text">${escapeHtml(story.story)}</p>
-        </div>
-      `).join('');
+        ` : '';
+        
+        return `
+          <div class="story">
+            <div class="story-header">
+              <div class="story-info">
+                <h3>${story.publicName ? story.name : 'Anonymous'}</h3>
+                <div class="story-meta">${story.address}</div>
+                <div class="story-date">${new Date(story.timestamp).toLocaleDateString()}</div>
+              </div>
+              <div class="story-amount">$${totalAmount.toLocaleString()}</div>
+            </div>
+            ${expensesHtml}
+            <p class="story-text">${escapeHtml(story.story)}</p>
+          </div>
+        `;
+      }).join('');
     }
 
     function escapeHtml(text) {
@@ -494,6 +619,9 @@
       form.classList.toggle('active');
       cta.style.display = form.classList.contains('active') ? 'none' : 'block';
       if (form.classList.contains('active')) {
+        if (document.getElementById('expensesContainer').children.length === 0) {
+          addExpense();
+        }
         form.scrollIntoView({ behavior: 'smooth' });
       }
     }
@@ -506,13 +634,21 @@
       errorEl.classList.remove('show');
       successEl.classList.remove('show');
       
+      const expenses = Array.from(document.querySelectorAll('.expense-item')).map(item => ({
+        category: item.querySelector('.expense-category').value,
+        amount: parseFloat(item.querySelector('.expense-amount').value || '0')
+      }));
+      
+      const totalAmount = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+      
       const formData = {
         name: document.getElementById('name').value,
         address: document.getElementById('address').value,
-        category: document.getElementById('category').value,
-        amount: parseFloat(document.getElementById('amount').value),
+        category: expenses[0]?.category || 'Other',
+        amount: totalAmount,
         story: document.getElementById('story').value,
-        publicName: document.getElementById('publicName').checked
+        publicName: document.getElementById('publicName').checked,
+        story_expenses: JSON.stringify(expenses)
       };
       
       try {
@@ -534,6 +670,7 @@
         successEl.classList.add('show');
         
         document.getElementById('storyForm').reset();
+        document.getElementById('expensesContainer').innerHTML = '';
         setTimeout(() => {
           toggleForm();
           loadStories();
