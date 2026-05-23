@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: gg-evacuation-relief
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+    disk:
+      - name: evacuation_db
+        mountPath: /var/data
+        sizeGB: 1
