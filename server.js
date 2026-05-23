@@ -32,6 +32,7 @@ function initializeDatabase() {
       amount REAL NOT NULL,
       story TEXT NOT NULL,
       publicName INTEGER DEFAULT 1,
+      story_expenses TEXT,
       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
       ipHash TEXT
     )
@@ -51,7 +52,7 @@ function hashIP(ip) {
 app.get('/api/stories', (req, res) => {
   const filter = req.query.category || 'All';
   
-  let query = 'SELECT id, name, address, category, amount, story, publicName, timestamp FROM stories ORDER BY timestamp DESC';
+  let query = 'SELECT id, name, address, category, amount, story, publicName, story_expenses, timestamp FROM stories ORDER BY timestamp DESC';
   
   db.all(query, [], (err, rows) => {
     if (err) {
@@ -80,7 +81,7 @@ app.get('/api/stories', (req, res) => {
 
 // Submit a new story
 app.post('/api/stories', (req, res) => {
-  const { name, address, category, amount, story, publicName } = req.body;
+  const { name, address, category, amount, story, publicName, story_expenses } = req.body;
   
   // Validation
   if (!name || !address || !category || !amount || !story) {
@@ -113,8 +114,8 @@ app.post('/api/stories', (req, res) => {
       
       // Insert story
       db.run(
-        'INSERT INTO stories (name, address, category, amount, story, publicName, ipHash) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [name, address, category, parseFloat(amount), story, publicName ? 1 : 0, ipHash],
+        'INSERT INTO stories (name, address, category, amount, story, publicName, story_expenses, ipHash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [name, address, category, parseFloat(amount), story, publicName ? 1 : 0, story_expenses || '[]', ipHash],
         function(err) {
           if (err) {
             console.error('Insert error:', err);
@@ -134,19 +135,31 @@ app.post('/api/stories', (req, res) => {
 
 // Export all data as CSV
 app.get('/api/export/csv', (req, res) => {
-  db.all('SELECT name, address, category, amount, story, publicName, timestamp FROM stories ORDER BY timestamp DESC', [], (err, rows) => {
+  db.all('SELECT name, address, category, amount, story, publicName, story_expenses, timestamp FROM stories ORDER BY timestamp DESC', [], (err, rows) => {
     if (err) {
       return res.status(500).json({ error: 'Export failed' });
     }
     
-    const data = rows.map(r => ({
-      name: r.publicName ? r.name : 'Anonymous',
-      address: r.address,
-      category: r.category,
-      amount: r.amount,
-      story: r.story,
-      date: new Date(r.timestamp).toLocaleDateString()
-    }));
+    const data = rows.map(r => {
+      let expenses = [];
+      try {
+        expenses = JSON.parse(r.story_expenses || '[]');
+      } catch (e) {
+        expenses = [];
+      }
+      
+      const expenseBreakdown = expenses.map(exp => `${exp.category}: $${exp.amount}`).join('; ');
+      
+      return {
+        name: r.publicName ? r.name : 'Anonymous',
+        address: r.address,
+        category: r.category,
+        amount: r.amount,
+        expenses: expenseBreakdown,
+        story: r.story,
+        date: new Date(r.timestamp).toLocaleDateString()
+      };
+    });
     
     try {
       const json2csvParser = new Parser();
@@ -163,7 +176,7 @@ app.get('/api/export/csv', (req, res) => {
 
 // Export all data as JSON
 app.get('/api/export/json', (req, res) => {
-  db.all('SELECT name, address, category, amount, story, publicName, timestamp FROM stories ORDER BY timestamp DESC', [], (err, rows) => {
+  db.all('SELECT name, address, category, amount, story, publicName, story_expenses, timestamp FROM stories ORDER BY timestamp DESC', [], (err, rows) => {
     if (err) {
       return res.status(500).json({ error: 'Export failed' });
     }
@@ -172,14 +185,24 @@ app.get('/api/export/json', (req, res) => {
       exportDate: new Date().toISOString(),
       totalStories: rows.length,
       totalCost: rows.reduce((sum, r) => sum + r.amount, 0),
-      stories: rows.map(r => ({
-        name: r.publicName ? r.name : 'Anonymous',
-        address: r.address,
-        category: r.category,
-        amount: r.amount,
-        story: r.story,
-        date: new Date(r.timestamp).toLocaleDateString()
-      }))
+      stories: rows.map(r => {
+        let expenses = [];
+        try {
+          expenses = JSON.parse(r.story_expenses || '[]');
+        } catch (e) {
+          expenses = [];
+        }
+        
+        return {
+          name: r.publicName ? r.name : 'Anonymous',
+          address: r.address,
+          category: r.category,
+          amount: r.amount,
+          expenses: expenses,
+          story: r.story,
+          date: new Date(r.timestamp).toLocaleDateString()
+        };
+      })
     };
     
     res.header('Content-Type', 'application/json');
