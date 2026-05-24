@@ -1,11 +1,10 @@
 {
   "name": "gg-evacuation-relief",
-  "version": "1.0.0",
-  "description": "Community platform for documenting evacuation costs from GKN chemical leak",
+  "version": "2.0.0",
+  "description": "Community platform for documenting GKN evacuation costs",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node server.js"
   },
   "keywords": ["evacuation", "relief", "community"],
   "author": "",
@@ -13,11 +12,7 @@
   "dependencies": {
     "express": "^4.18.2",
     "cors": "^2.8.5",
-    "sqlite3": "^5.1.6",
-    "json2csv": "^5.0.7"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.1"
+    "pg": "^8.11.3"
   },
   "engines": {
     "node": ">=14.0.0"
